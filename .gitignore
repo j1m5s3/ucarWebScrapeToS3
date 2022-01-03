@@ -1,0 +1,19 @@
+# Folders #
+##############
+**/__pycache__/
+**/ucar_file_manifests_per_mission/
+**/jobs/
+
+# Filetypes #
+##############
+*.pyc
+*.csv
+*.txt
+*.json
+
+# Files #
+##############
+**/.pytest_cache
+**/.eggs
+**/*.egg-info
+**.cache
