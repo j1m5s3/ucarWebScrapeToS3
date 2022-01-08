@@ -47,7 +47,7 @@ def compare_against_obj_key_file(filepath, mission):
 
 def get_obj_key_file_list(mission):
 
-    bucket_url = 's3://ucar-earth-ro-archive/'
+    #bucket_url = 's3://ucar-earth-ro-archive/'
     with open(local_s3_obj_key_file, 'r') as the_s3_obj_file:
         obj_file_content = the_s3_obj_file.read().split('\n')
 
@@ -55,7 +55,8 @@ def get_obj_key_file_list(mission):
     for the_item in obj_file_content:
         if check_if_correct_level(the_item):
             if the_item not in the_obj_file_keys and mission in the_item:
-                the_obj_file_keys.append(os.path.join(bucket_url, the_item))
+                #the_obj_file_keys.append(os.path.join(bucket_url, the_item))
+                the_obj_file_keys.append(the_item)
 
     return the_obj_file_keys
 
@@ -63,11 +64,14 @@ def get_obj_key_file_list(mission):
 def get_ucar_file_url_list(filepath):
 
     with open(filepath, 'r') as the_ucar_inventory_file:
-        the_ucar_inventory = the_ucar_inventory_file.read().split(',')
+        #the_ucar_inventory = the_ucar_inventory_file.read().split(',')
+        the_ucar_inventory = the_ucar_inventory_file.read().split(',')[:-1]
 
-    the_ucar_urls = []
-    for the_item in the_ucar_inventory:
-        if len(the_item.split(ucar_site)) == 2:
-            the_ucar_urls.append(the_item)
+    #the_ucar_urls = []
+    #for the_item in the_ucar_inventory:
+    #    if len(the_item.split(ucar_site)) == 2:
+    #        the_ucar_urls.append(the_item)
 
-    return the_ucar_urls
+    #return the_ucar_urls
+    return the_ucar_inventory
+

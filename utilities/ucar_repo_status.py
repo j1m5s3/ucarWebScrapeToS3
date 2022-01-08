@@ -2,6 +2,7 @@ import os
 import requests
 import logging
 import json
+import re
 import numpy as np
 from datetime import date
 from bs4 import BeautifulSoup
@@ -15,6 +16,9 @@ ucar_urls = []
 current_yr = date.today().year
 doy_arr = [str(doy).zfill(3) for doy in np.arange(0,367,1)]
 year_arr = [str(yr) for yr in np.arange(1990, current_yr + 1, 1)]
+
+
+home_path = os.environ['HOME']
 
 
 def check_if_correct_level(url):
@@ -69,6 +73,7 @@ def recursive_scrape(url):
     soup = BeautifulSoup(response.text, 'html.parser')
     mission = url.split('/')[4]
     filename = f"{mission}.txt"
+    # Change filepath so that it is not using hard coded paths such as "ucar_manifests_loc" 1/5/2022
     filepath = os.path.join(ucar_manifests_loc, filename)
 
     href_list = []
@@ -94,7 +99,7 @@ def recursive_scrape(url):
                 print("drilling down ----> ", new_url)
                 recursive_scrape(new_url)
 
-    return
+    return ucar_urls
 
 
 def check_last_searched(manifest_filepath):
@@ -169,8 +174,9 @@ def create_last_searched_json(manifest_file_path_list):
     print(manifest_last_searched_dict.keys())
     with open("last_searched_info.json", 'w+') as json_file:
         json.dump(manifest_last_searched_dict, json_file)
+        path_to_file = json_file.name
 
-    return
+    return path_to_file
 
 
 def check_for_new_ucar_entries(manifest_last_searched_dict):
@@ -182,7 +188,6 @@ def check_for_new_ucar_entries(manifest_last_searched_dict):
         mission_no_slash_list = [the_mission_link.replace('/', '') for the_mission_link in mission_level_url_list]
         new_missions = set(mission_no_slash_list).difference(set(manifest_last_searched_dict.keys()))
         new_url_entries.extend(list(new_missions))
-    print(new_url_entries)
 
     for mission in manifest_last_searched_dict.keys():
 
@@ -254,10 +259,12 @@ def check_new_proctype_year(proctype_url, last_searched_year):
             href_tag_text = a_tag.attrs.get('href')
             href_list.append(href_tag_text)
 
-        last_yr_from_url = href_list[-1].split('/')[0]
-        if int(last_searched_year) < int(last_yr_from_url):
-            url_with_year = os.path.join(url_with_level, last_yr_from_url, '')
-            new_url_entries.append(url_with_year)
+        #last_yr_from_url = href_list[-1].split('/')[0]
+        for yr_link in href_list[1:]:
+            the_yr = yr_link.split('/')[0]
+            if int(last_searched_year) < int(the_yr):
+                url_with_year = os.path.join(url_with_level, the_yr, '')
+                new_url_entries.append(url_with_year)
 
     return new_url_entries
 
@@ -277,12 +284,43 @@ def check_new_doy(proctype_url, last_searched_year, last_searched_doy):
             href_tag_text = a_tag.attrs.get('href')
             href_list.append(href_tag_text)
 
-        last_doy_from_url = href_list[-1].split('/')[0]
-        if int(last_searched_doy) < int(last_doy_from_url):
-            url_with_year = os.path.join(url_with_level, last_doy_from_url, '')
-            new_url_entries.append(url_with_year)
+        for doy_link in href_list[1:]:
+            doy = doy_link.split('/')[0]
+            if int(last_searched_doy) < int(doy):
+                url_with_year = os.path.join(url_with_level, doy, '')
+                new_url_entries.append(url_with_year)
 
     return new_url_entries
+
+
+def download_file(url):
+
+    local_filename = url.split('/')[-1]
+    local_root_path = create_local_dir_mirror_ucar(url)
+    full_path = os.path.join(local_root_path, local_filename)
+
+    # NOTE the stream=True parameter below
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        with open(full_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                # If you have chunk encoded response uncomment if
+                # and set chunk_size parameter to None.
+                #if chunk:
+                f.write(chunk)
+    print("File downloaded to: ", full_path)
+    return full_path
+
+
+def create_local_dir_mirror_ucar(url):
+
+    root_path = os.path.split(url.replace(ucar_site, ''))[0]
+    local_path = os.path.join(home_path, root_path)
+
+    os.makedirs(local_path, exit_ok=True)
+
+    return local_path
+
 
 """
     Get initial manifests 
