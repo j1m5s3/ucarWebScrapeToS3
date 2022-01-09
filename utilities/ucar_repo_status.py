@@ -315,12 +315,61 @@ def download_file(url):
 def create_local_dir_mirror_ucar(url):
 
     root_path = os.path.split(url.replace(ucar_site, ''))[0]
-    local_path = os.path.join(home_path, root_path)
+    local_path = os.path.join(home_path, 'ucar_repo', root_path)
 
-    os.makedirs(local_path, exit_ok=True)
+    os.makedirs(local_path, exist_ok=True)
 
     return local_path
 
+
+def create_s3_obj_key_file(bucket):
+
+    bucket_obj_list = []
+    for my_bucket_object in bucket.objects.all():
+        key = my_bucket_object.key
+        if "conPhs" in key or "atmPhs" in key or "atmPrf" in key or "wetPrf" in key or "wetPf2" in key:
+            bucket_obj_list.append(key)
+            print(my_bucket_object.key)
+
+    the_date = date.today().isoformat()
+    filename = f"s3_obj_keys_{the_date}.txt"
+    with open(filename, 'w') as new_obj_file:
+        for key in bucket_obj_list:
+            new_obj_file.write(f"{key}\n")
+        file_loc = new_obj_file.name
+
+    return file_loc
+
+
+def add_zero_pad_doy_to_key_file():
+    with open(s3_obj_key_file_path, 'r') as s3_obj_key_file:
+        with open("/home/i28373/zero_pad_ucar_objKey.txt", 'w') as new_s3_obj_key_file:
+            for line in s3_obj_key_file:
+                obj_file_key = check_zero_pad_doy(line.strip())
+                new_file_str = obj_file_key + "\n"
+                new_s3_obj_key_file.write(new_file_str)
+    return
+
+
+def check_zero_pad_doy(obj_file_key):
+
+    print(f"obj_file_key: {obj_file_key}")
+    no_zero_pad_two_digit = re.search("/([0-9][0-9])/", obj_file_key)
+    no_zero_pad_one_digit = re.search("/([0-9])/", obj_file_key)
+    if no_zero_pad_one_digit != None:
+        print(f"no_zero_pad_one_digit: {no_zero_pad_one_digit.groups()}")
+        number          = no_zero_pad_one_digit.group(0).split('/')[1].zfill(3)
+        replace_str     = f"/{number}/"
+        zero_pad_key    = re.sub(r"/([0-9])/", replace_str, obj_file_key)
+        return zero_pad_key
+    if no_zero_pad_two_digit != None:
+        print(f"no_zero_pad_two_digit: {no_zero_pad_two_digit.groups()}")
+        number          = no_zero_pad_two_digit.group(0).split('/')[1].zfill(3)
+        replace_str     = f"/{number}/"
+        zero_pad_key    = re.sub(r"/([0-9][0-9])/", replace_str, obj_file_key)
+        return zero_pad_key
+
+    return obj_file_key
 
 """
     Get initial manifests 

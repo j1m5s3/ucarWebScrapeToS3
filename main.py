@@ -4,7 +4,7 @@ import os
 import time
 import json
 from utilities.ucar_repo_status import recursive_scrape, get_mission_level_urls, check_last_searched, \
-    create_last_searched_json, check_for_new_ucar_entries, ucar_urls, download_file
+    create_last_searched_json, check_for_new_ucar_entries, ucar_urls, download_file, create_s3_obj_key_file
 
 from utilities.compare_in_s3 import compare_against_obj_key_file, get_obj_key_file_list, get_ucar_file_url_list
 
@@ -119,18 +119,20 @@ def live_run():
         print(to_download_list)
         if len(to_download_list) > 0:
             bucket = aws_s3_bucket(aws_profile, test_bucket_name)
-            # download locally
-            # upload to s3
 
             for to_download_item in to_download_list:
+                # download locally
                 path_to_local_file = download_file(to_download_item)
                 s3_key = to_download_item.replace(ucar_site, '')
-                bucket.upload_file(path_to_local_file, s3_key)
+
+                # upload to s3
+                response = bucket.upload_file(path_to_local_file, s3_key)
+                print(response)
+
             # publish new s3_obj_key_file
-            
-            # publish new last_searched_info.json
-            # update dynamodb
-            pass
+            local_key_file_path = create_s3_obj_key_file(bucket)
+
+                # publish new last_searched_info.json
 
     return
 

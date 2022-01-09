@@ -105,11 +105,11 @@ def create_sort_key(year, doy):
 
 def aws_s3_bucket(profile, bucket_name):
 
-    bucket_name = 'ucar-earth-ro-archive'
+    #bucket_name = 'ucar-earth-ro-archive'
     profile = 'aernasaprod'
 
     session = boto3.Session(profile_name=profile)
-    bucket = session.resource('s3').Bucket(bucket_name=bucket_name)
+    bucket = session.resource('s3').Bucket(bucket_name)
 
     return bucket
 
