@@ -14,11 +14,24 @@ LOGGER = logging.getLogger(__name__)
 
 ucar_urls = []
 current_yr = date.today().year
+date_today = date.today()
 doy_arr = [str(doy).zfill(3) for doy in np.arange(0,367,1)]
 year_arr = [str(yr) for yr in np.arange(1990, current_yr + 1, 1)]
 
+data_description_missions = ['gpsmet/', 'gpsmetas/', 'grace/', 'sacc/', 'champ/', 'cosmic1/', 'cosmic2/',
+                             'tsx/', 'tdx/', 'cnofs/', 'metopa/', 'metopb/', 'metopc/', 'kompsat5/', 'paz/']
 
 home_path = os.environ['HOME']
+
+valid_proc_types = ['repro2016/', 'postProc/', 'repro2013/', 'nrt/']
+
+
+def check_if_valid_proc_type(url):
+
+    for valid_proc in valid_proc_types:
+        if valid_proc in url:
+            return True
+    return False
 
 
 def check_if_correct_level(url):
@@ -62,7 +75,8 @@ def get_mission_level_urls(url):
         href_tag_text = a_tag.attrs.get('href')
         href_list.append(href_tag_text)
 
-    new_mission_level_urls = [os.path.join(url, mission) for mission in href_list[1:] if mission != "fid/"]
+    new_mission_level_urls = [os.path.join(url, mission) for mission in href_list[1:]
+                              if mission in data_description_missions]
 
     return new_mission_level_urls
 
@@ -93,11 +107,12 @@ def recursive_scrape(url):
                     ucar_urls.append(new_url)
 
         if new_url.endswith('/'):
-            if check_if_correct_level(new_url):
-                #if check_if_in_doy_level(new_url):
-                #LOGGER.info(new_url)
-                print("drilling down ----> ", new_url)
-                recursive_scrape(new_url)
+            if check_if_valid_proc_type(new_url):
+                if check_if_correct_level(new_url):
+                    #if check_if_in_doy_level(new_url):
+                    #LOGGER.info(new_url)
+                    print("drilling down ----> ", new_url)
+                    recursive_scrape(new_url)
 
     return ucar_urls
 
@@ -182,6 +197,7 @@ def create_last_searched_json(manifest_file_path_list):
 def check_for_new_ucar_entries(manifest_last_searched_dict):
 
     new_url_entries = []
+    signal_new_proctype_dict = {}
 
     mission_level_url_list = get_mission_level_urls(ucar_site)
     if len(mission_level_url_list) > len(manifest_last_searched_dict.keys()):
@@ -197,6 +213,9 @@ def check_for_new_ucar_entries(manifest_last_searched_dict):
 
             new_proc_type_urls = check_new_proctype(mission_url,
                                                     manifest_last_searched_dict[mission]['mission_proctypes'])
+            if len(new_proc_type_urls) > 0:
+                signal_new_proctype_dict.update({mission: new_proc_type_urls})
+
             new_year_urls = check_new_proctype_year(proctype_url,
                                                     manifest_last_searched_dict[mission]['last_searched_yr'])
             new_doy_urls = check_new_doy(proctype_url, manifest_last_searched_dict[mission]['last_searched_yr'],
@@ -211,6 +230,9 @@ def check_for_new_ucar_entries(manifest_last_searched_dict):
             proctype_url = os.path.join(mission_url, manifest_last_searched_dict[mission]['last_searched_proctype'], '')
 
             new_proc_type_urls = check_new_proctype(mission_url, manifest_last_searched_dict[mission]['mission_proctypes'])
+            if len(new_proc_type_urls) > 0:
+                signal_new_proctype_dict.update({mission: new_proc_type_urls})
+
             new_year_urls = check_new_proctype_year(proctype_url, manifest_last_searched_dict[mission]['last_searched_yr'])
             new_doy_urls = check_new_doy(proctype_url, manifest_last_searched_dict[mission]['last_searched_yr'],
                                          manifest_last_searched_dict[mission]['last_searched_doy'])
@@ -218,6 +240,12 @@ def check_for_new_ucar_entries(manifest_last_searched_dict):
             new_url_entries.extend(new_proc_type_urls)
             new_url_entries.extend(new_year_urls)
             new_url_entries.extend(new_doy_urls)
+
+    if len(signal_new_proctype_dict.keys()) > 0:
+        the_curr_date = date_today
+        filename = f"signal_new_proc_type_{the_curr_date}.json"
+        with open(filename, 'w+') as signal_file:
+            json.dump(signal_new_proctype_dict, signal_file)
 
     return new_url_entries
 
@@ -341,6 +369,7 @@ def create_s3_obj_key_file(bucket):
     return file_loc
 
 
+# To be run on ucar-earth-ro-archive bucket obj_key_file 1/10/2022
 def add_zero_pad_doy_to_key_file():
     with open(s3_obj_key_file_path, 'r') as s3_obj_key_file:
         with open("/home/i28373/zero_pad_ucar_objKey.txt", 'w') as new_s3_obj_key_file:

@@ -3,6 +3,7 @@ import pathlib
 import os
 import time
 import json
+from datetime import date
 from utilities.ucar_repo_status import recursive_scrape, get_mission_level_urls, check_last_searched, \
     create_last_searched_json, check_for_new_ucar_entries, ucar_urls, download_file, create_s3_obj_key_file
 
@@ -91,48 +92,95 @@ def test_boto3_calls(the_manifest_file):
 
 
 def live_run():
+    bucket = aws_s3_bucket(aws_profile, test_bucket_name)
 
     file_manifest_list = os.listdir(os.path.join(parentDir, 'ucar_file_manifests_per_mission', ""))
     file_manifests_path_list = []
+
     to_download_list = []
 
     if len(file_manifest_list) > 0:
         for manifest_file in file_manifest_list:
             manifest_filepath = os.path.join(parentDir, 'ucar_file_manifests_per_mission', manifest_file)
             file_manifests_path_list.append(manifest_filepath)
+    else:
+        for obj in bucket.objects.filter(Delimiter='/', Prefix='ucar_file_manifest_per_mission/'):
+            obj_key = obj.key
+            filename = obj_key.split('/')[1]
+            local_path = os.path.join(parentDir, 'ucar_file_manifests_per_mission', filename)
+            print("local: ", local_path, " | obj.key: ", obj_key)
+            bucket.download_file(obj_key, local_path)
 
-        # Change logic for determining if last_searched_info.json is available 1/8/2022
-        if "last_searched_info.json" not in os.listdir(parentDir):
-            print("Creating new last_searched_info.json...")
-            last_searched_json_path = create_last_searched_json(file_manifests_path_list)
-            with open(last_searched_json_path, 'r+') as the_json_file:
-                last_searched_dict = json.load(the_json_file)
-        else:
-            with open("last_searched_info.json", 'r+') as the_json_file:
-                last_searched_dict = json.load(the_json_file)
+        file_manifest_list = os.listdir(os.path.join(parentDir, 'ucar_file_manifests_per_mission', ""))
+        for manifest_file in file_manifest_list:
+            manifest_filepath = os.path.join(parentDir, 'ucar_file_manifests_per_mission', manifest_file)
+            file_manifests_path_list.append(manifest_filepath)
+    print(file_manifests_path_list)
+    # Change logic for determining if last_searched_info.json is available 1/8/2022
+    if "last_searched_info.json" not in os.listdir(parentDir):
+        print("Creating new last_searched_info.json...")
+        last_searched_json_path = create_last_searched_json(file_manifests_path_list)
+        with open(last_searched_json_path, 'r+') as the_json_file:
+            last_searched_dict = json.load(the_json_file)
+    else:
+        with open("last_searched_info.json", 'r+') as the_json_file:
+            last_searched_dict = json.load(the_json_file)
 
-        new_ucar_urls = check_for_new_ucar_entries(last_searched_dict)
-        for new_url in new_ucar_urls:
-            recursive_scrape(new_url)
-        to_download_list.extend(ucar_urls)
+    new_ucar_urls = check_for_new_ucar_entries(last_searched_dict)
+    for new_url in new_ucar_urls:
+        recursive_scrape(new_url)
+    to_download_list.extend(ucar_urls)
 
-        print(to_download_list)
-        if len(to_download_list) > 0:
-            bucket = aws_s3_bucket(aws_profile, test_bucket_name)
+    print(to_download_list)
+    if len(to_download_list) > 0:
 
-            for to_download_item in to_download_list:
-                # download locally
+        for to_download_item in to_download_list:
+            # download locally
+            # conditional for testing only 1/9/2022
+            if "conPhs" not in to_download_item and "atmPhs" not in to_download_item:
                 path_to_local_file = download_file(to_download_item)
                 s3_key = to_download_item.replace(ucar_site, '')
 
                 # upload to s3
-                response = bucket.upload_file(path_to_local_file, s3_key)
-                print(response)
+                bucket.upload_file(path_to_local_file, s3_key)
 
-            # publish new s3_obj_key_file
-            local_key_file_path = create_s3_obj_key_file(bucket)
+        new_proctype_signal_file = f'signal_new_proc_type_{date.today()}.json'
+        if new_proctype_signal_file in os.listdir(parentDir):
+            bucket.upload_file(new_proctype_signal_file, new_proctype_signal_file)
+        # publish new s3_obj_key_file
+        local_key_file_path = create_s3_obj_key_file(bucket)
+        obj_key_filename = os.path.basename(local_key_file_path)
+        bucket.upload_file(local_key_file_path, obj_key_filename)
+        # publish new last_searched_info.json
 
-                # publish new last_searched_info.json
+    return
+
+
+def test_download():
+
+    bucket = aws_s3_bucket(aws_profile, test_bucket_name)
+    for obj in bucket.objects.filter(Delimiter='/', Prefix='ucar_file_manifest_per_mission/'):
+        obj_key = obj.key
+        filename = obj_key.split('/')[1]
+        local_path = os.path.join(parentDir, 'ucar_file_manifests_per_mission', filename)
+        print("local: ", local_path, " | obj.key: ", obj_key)
+        bucket.download_file(obj_key, local_path)
+
+
+def upload_manifest_files_to_s3():
+
+    bucket = aws_s3_bucket(aws_profile, test_bucket_name)
+
+    file_manifest_list = os.listdir(os.path.join(parentDir, 'ucar_file_manifests_per_mission', ""))
+    file_manifests_path_list = []
+
+    for manifest_file in file_manifest_list:
+        manifest_filepath = os.path.join(parentDir, 'ucar_file_manifests_per_mission', manifest_file)
+        file_manifests_path_list.append(manifest_filepath)
+
+    for file_path in file_manifests_path_list:
+        s3_key = os.path.join('ucar_file_manifest_per_mission', os.path.basename(file_path))
+        bucket.upload_file(file_path, s3_key)
 
     return
 
@@ -140,7 +188,7 @@ def live_run():
 if __name__ == '__main__':
 
     start = time.perf_counter()
-
+    print(mission_urls)
     #with Pool(len(mission_urls)) as p:
     #    p.map(recursive_scrape, mission_urls)
     #if len(mission_urls) ==
@@ -149,7 +197,11 @@ if __name__ == '__main__':
     #for url in mission_urls:
     #    print(url)
     #    recursive_scrape(url)
-
+    #test_mission_urls = ["https://data.cosmic.ucar.edu/gnss-ro/cosmic2/", "https://data.cosmic.ucar.edu/gnss-ro/cosmic1/"]
+    #with Pool(4) as p:
+    #    p.map(recursive_scrape, test_mission_urls)
+    #for url in test_mission_urls:
+    #    recursive_scrape(url)
     #file_manifest_list = os.listdir(os.path.join(parentDir, 'ucar_file_manifests_per_mission', ""))
     #file_manifests_path_list = []
     #for manifest_file in file_manifest_list:
@@ -169,6 +221,8 @@ if __name__ == '__main__':
     #    with open("diff.json", 'w+') as diff_json:
     #        json.dump(diff_dict, diff_json)
     live_run()
+    #test_download()
+    upload_manifest_files_to_s3()
     end = time.perf_counter()
     print(f"runtime = {end - start}")
 
