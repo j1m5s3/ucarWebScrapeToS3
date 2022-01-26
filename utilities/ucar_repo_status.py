@@ -21,6 +21,15 @@ year_arr = [str(yr) for yr in np.arange(1990, current_yr + 1, 1)]
 data_description_missions = ['gpsmet/', 'gpsmetas/', 'grace/', 'sacc/', 'champ/', 'cosmic1/', 'cosmic2/',
                              'tsx/', 'tdx/', 'cnofs/', 'metopa/', 'metopb/', 'metopc/', 'kompsat5/', 'paz/']
 
+#data_description_missions_urls = ['https://data.cosmic.ucar.edu/gnss-ro/champ/', 'https://data.cosmic.ucar.edu/gnss-ro/cnofs/',
+#                                  'https://data.cosmic.ucar.edu/gnss-ro/cosmic1/', 'https://data.cosmic.ucar.edu/gnss-ro/cosmic2/',
+#                                  'https://data.cosmic.ucar.edu/gnss-ro/gpsmet/', 'https://data.cosmic.ucar.edu/gnss-ro/gpsmetas/',
+#                                  'https://data.cosmic.ucar.edu/gnss-ro/grace/', 'https://data.cosmic.ucar.edu/gnss-ro/kompsat5/',
+#                                  'https://data.cosmic.ucar.edu/gnss-ro/metopa/', 'https://data.cosmic.ucar.edu/gnss-ro/metopb/',
+#                                  'https://data.cosmic.ucar.edu/gnss-ro/metopc/', 'https://data.cosmic.ucar.edu/gnss-ro/paz/',
+#                                  'https://data.cosmic.ucar.edu/gnss-ro/sacc/', 'https://data.cosmic.ucar.edu/gnss-ro/tdx/',
+#                                  'https://data.cosmic.ucar.edu/gnss-ro/tsx/']
+
 home_path = os.environ['HOME']
 
 valid_proc_types = ['repro2016/', 'postProc/', 'repro2013/', 'nrt/']
@@ -75,10 +84,15 @@ def get_mission_level_urls(url):
         href_tag_text = a_tag.attrs.get('href')
         href_list.append(href_tag_text)
 
-    new_mission_level_urls = [os.path.join(url, mission) for mission in href_list[1:]
-                              if mission in data_description_missions]
+    data_description_mission_urls = [os.path.join(url, mission) for mission in href_list[1:]
+                                    if mission in data_description_missions]
+    non_data_description_mission_urls = [os.path.join(url, mission) for mission in href_list[1:]
+                                    if mission not in data_description_missions and mission !='fid/']
 
-    return new_mission_level_urls
+    mission_url_dict = {'data_description': data_description_mission_urls,
+                        'non_data_description': non_data_description_mission_urls}
+
+    return mission_url_dict
 
 
 def recursive_scrape(url):
@@ -265,8 +279,9 @@ def check_new_proctype(mission_url, proctype_list):
     for proctype_link in href_list[1:]:
         proctype = proctype_link.split('/')[0]
         if proctype != 'tools' and proctype != 'provisional':
-            print("mission_url: ", mission_url, " | ", proctype)
+            #print("mission_url: ", mission_url, " | ", proctype)
             if proctype not in proctype_list:
+                #print(f"NEW PROC TYPE: {proctype}")
                 new_url_entries.append(os.path.join(mission_url, proctype, ''))
 
     return new_url_entries

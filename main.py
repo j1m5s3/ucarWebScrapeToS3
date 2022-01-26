@@ -5,7 +5,8 @@ import time
 import json
 from datetime import date
 from utilities.ucar_repo_status import recursive_scrape, get_mission_level_urls, check_last_searched, \
-    create_last_searched_json, check_for_new_ucar_entries, ucar_urls, download_file, create_s3_obj_key_file
+    create_last_searched_json, check_for_new_ucar_entries, ucar_urls, download_file, create_s3_obj_key_file, \
+    check_new_proctype, check_new_doy, check_new_proctype_year
 
 from utilities.compare_in_s3 import compare_against_obj_key_file, get_obj_key_file_list, get_ucar_file_url_list
 
@@ -30,8 +31,8 @@ mission_urls = get_mission_level_urls(ucar_site)
 
 aws_profile = 'aernasaprod'
 
-table_name = 'gnss-ro-available-tar-file-table'
-dynamodb = aws_dynamodb_table(aws_profile, table_name)
+#table_name = 'gnss-ro-available-tar-file-table'
+#dynamodb = aws_dynamodb_table(aws_profile, table_name)
 
 bucket_url = 's3://ucar-earth-ro-archive/'
 test_bucket_urls = 's3://processed-nasa-access-data-in-work/'
@@ -156,6 +157,51 @@ def live_run():
     return
 
 
+def use_policies_json():
+
+    with open("policies.json", 'r+') as the_json_file:
+        policy_dict = json.load(the_json_file)
+
+    to_search_urls = []
+    to_download_list = []
+    if len(mission_urls['non_data_description']) > 0:
+        LOGGER.info(f"NEW MISSIONS FOUND: {mission_urls['non_data_description']}")
+
+    for mission in policy_dict.keys():
+        proc_type_list = []
+        mission_url = os.path.join(ucar_site, mission, '')
+        for proc_type in policy_dict[mission].keys():
+            proc_type_list.append(proc_type)
+            if policy_dict[mission][proc_type]['policy'] != "keep_none":
+                policy_url = os.path.join(ucar_site, mission, proc_type, '')
+
+                policy_end_year = policy_dict[mission][proc_type]['end_date'].split('-')[0]
+                policy_end_doy = policy_dict[mission][proc_type]['end_date'].split('-')[0]
+
+                new_year_urls = check_new_proctype_year(policy_url, policy_end_year)
+                new_doy_urls = check_new_doy(policy_url, policy_end_year, policy_end_doy)
+                if len(new_year_urls) > 0:
+                    to_search_urls.extend(new_year_urls)
+                    new_year_end = new_year_urls[0].split('/')[-2]
+                    new_doy_end = check_new_doy(policy_url, new_year_end, '000')[-1].split('/')[-2]
+                    new_end_date = f"{new_year_end}-{new_doy_end}"
+                    policy_dict[mission][proc_type]["end_date"] = new_end_date
+                if len(new_doy_urls) > 0:
+                    to_search_urls.extend(new_doy_urls)
+
+        new_proc_types = check_new_proctype(mission_url, proc_type_list)
+        if len(new_proc_types) > 0:
+            LOGGER.info(f"NEW PROC TYPES FOUND FOR {mission}: {new_proc_types}")
+
+    print(to_search_urls)
+    for url in to_search_urls:
+        recursive_scrape(url)
+    to_download_list.extend(ucar_urls)
+    print(to_download_list)
+
+    return
+
+
 def test_download():
 
     bucket = aws_s3_bucket(aws_profile, test_bucket_name)
@@ -188,7 +234,7 @@ def upload_manifest_files_to_s3():
 if __name__ == '__main__':
 
     start = time.perf_counter()
-    print(mission_urls)
+    #print(mission_urls)
     #with Pool(len(mission_urls)) as p:
     #    p.map(recursive_scrape, mission_urls)
     #if len(mission_urls) ==
@@ -220,9 +266,10 @@ if __name__ == '__main__':
     #        diff_dict.update(compare_against_obj_key_file(manifest_filepath, mission))
     #    with open("diff.json", 'w+') as diff_json:
     #        json.dump(diff_dict, diff_json)
-    live_run()
+    #live_run()
+    use_policies_json()
     #test_download()
-    upload_manifest_files_to_s3()
+    #upload_manifest_files_to_s3()
     end = time.perf_counter()
     print(f"runtime = {end - start}")
 
