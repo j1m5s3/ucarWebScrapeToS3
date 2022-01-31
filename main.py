@@ -6,7 +6,7 @@ import json
 from datetime import date
 from utilities.ucar_repo_status import recursive_scrape, get_mission_level_urls, check_last_searched, \
     create_last_searched_json, check_for_new_ucar_entries, ucar_urls, download_file, create_s3_obj_key_file, \
-    check_new_proctype, check_new_doy, check_new_proctype_year
+    check_new_proctype, check_new_doy, check_new_proctype_year, check_before_doy, check_before_proctype_year
 
 from utilities.compare_in_s3 import compare_against_obj_key_file, get_obj_key_file_list, get_ucar_file_url_list
 
@@ -174,20 +174,40 @@ def use_policies_json():
             proc_type_list.append(proc_type)
             if policy_dict[mission][proc_type]['policy'] != "keep_none":
                 policy_url = os.path.join(ucar_site, mission, proc_type, '')
-
+                policy_start_year = policy_dict[mission][proc_type]['start_date'].split('-')[0]
+                policy_start_doy = policy_dict[mission][proc_type]['start_date'].split('-')[1]
                 policy_end_year = policy_dict[mission][proc_type]['end_date'].split('-')[0]
-                policy_end_doy = policy_dict[mission][proc_type]['end_date'].split('-')[0]
+                policy_end_doy = policy_dict[mission][proc_type]['end_date'].split('-')[1]
 
-                new_year_urls = check_new_proctype_year(policy_url, policy_end_year)
-                new_doy_urls = check_new_doy(policy_url, policy_end_year, policy_end_doy)
-                if len(new_year_urls) > 0:
-                    to_search_urls.extend(new_year_urls)
-                    new_year_end = new_year_urls[0].split('/')[-2]
-                    new_doy_end = check_new_doy(policy_url, new_year_end, '000')[-1].split('/')[-2]
-                    new_end_date = f"{new_year_end}-{new_doy_end}"
-                    policy_dict[mission][proc_type]["end_date"] = new_end_date
-                if len(new_doy_urls) > 0:
-                    to_search_urls.extend(new_doy_urls)
+                if policy_dict[mission][proc_type]['policy'] == 'keep_all':
+                    to_search_urls.append(policy_url)
+                if policy_dict[mission][proc_type]['policy'] == 'keep_after':
+                    # keep after start date
+                    to_search_urls.extend(check_new_doy(policy_url, policy_start_year, policy_start_doy))
+                    to_search_urls.extend(check_new_proctype_year(policy_url, policy_start_year))
+                if policy_dict[mission][proc_type]['policy'] == 'keep_before':
+                    # keep before end date
+                    to_search_urls.extend(check_before_doy(policy_url, policy_end_year, policy_end_doy))
+                    to_search_urls.extend(check_before_proctype_year(policy_url, policy_end_year))
+                if policy_dict[mission][proc_type]['policy'] == 'keep_after_and_before':
+                    # keep between start and end date
+                    to_search_urls.extend(check_new_doy(policy_url, policy_start_year, policy_start_doy))
+                    to_search_urls.extend(check_before_doy(policy_url, policy_end_year, policy_end_doy))
+                    year_before_end_urls = check_before_proctype_year(policy_url, policy_end_year)
+                    for the_year_url in year_before_end_urls:
+                        if policy_end_year not in the_year_url and policy_start_year not in the_year_url:
+                            to_search_urls.append(the_year_url)
+
+                #new_year_urls = check_new_proctype_year(policy_url, policy_end_year)
+                #new_doy_urls = check_new_doy(policy_url, policy_end_year, policy_end_doy)
+                #if len(new_year_urls) > 0:
+                #    to_search_urls.extend(new_year_urls)
+                #    new_year_end = new_year_urls[0].split('/')[-2]
+                #    new_doy_end = check_new_doy(policy_url, new_year_end, '000')[-1].split('/')[-2]
+                #    new_end_date = f"{new_year_end}-{new_doy_end}"
+                #    policy_dict[mission][proc_type]["end_date"] = new_end_date
+                #if len(new_doy_urls) > 0:
+                #    to_search_urls.extend(new_doy_urls)
 
         new_proc_types = check_new_proctype(mission_url, proc_type_list)
         if len(new_proc_types) > 0:

@@ -312,6 +312,31 @@ def check_new_proctype_year(proctype_url, last_searched_year):
     return new_url_entries
 
 
+def check_before_proctype_year(proctype_url, last_searched_year):
+
+    new_url_entries = []
+
+    for level in ['level1b/', 'level2/']:
+        url_with_level = os.path.join(proctype_url, level)
+
+        response = requests.get(url_with_level)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        href_list = []
+        for a_tag in soup.findAll('a'):
+            href_tag_text = a_tag.attrs.get('href')
+            href_list.append(href_tag_text)
+
+        #last_yr_from_url = href_list[-1].split('/')[0]
+        for yr_link in href_list[1:]:
+            the_yr = yr_link.split('/')[0]
+            if int(last_searched_year) > int(the_yr):
+                url_with_year = os.path.join(url_with_level, the_yr, '')
+                new_url_entries.append(url_with_year)
+
+    return new_url_entries
+
+
 def check_new_doy(proctype_url, last_searched_year, last_searched_doy):
 
     new_url_entries = []
@@ -335,6 +360,29 @@ def check_new_doy(proctype_url, last_searched_year, last_searched_doy):
 
     return new_url_entries
 
+
+def check_before_doy(proctype_url, last_searched_year, last_searched_doy):
+
+    new_url_entries = []
+
+    for level in ['level1b/', 'level2/']:
+        url_with_level = os.path.join(proctype_url, level, last_searched_year, '')
+
+        response = requests.get(url_with_level)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        href_list = []
+        for a_tag in soup.findAll('a'):
+            href_tag_text = a_tag.attrs.get('href')
+            href_list.append(href_tag_text)
+
+        for doy_link in href_list[1:]:
+            doy = doy_link.split('/')[0]
+            if int(last_searched_doy) > int(doy):
+                url_with_year = os.path.join(url_with_level, doy, '')
+                new_url_entries.append(url_with_year)
+
+    return new_url_entries
 
 def download_file(url):
 
