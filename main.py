@@ -222,6 +222,9 @@ def use_policies_json():
     to_download_list.extend(ucar_urls)
     print(to_download_list)
 
+    refined_to_download_list = compare_against_obj_key_file(to_download_list)
+    # Then download files in refined_to_download_list
+
     return
 
 
