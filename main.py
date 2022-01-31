@@ -158,7 +158,10 @@ def live_run():
 
 
 def use_policies_json():
-
+    """
+    Driver for web scraping utility that utilizes policies.json for determining
+    :return:
+    """
     with open("policies.json", 'r+') as the_json_file:
         policy_dict = json.load(the_json_file)
 

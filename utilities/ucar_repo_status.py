@@ -21,14 +21,6 @@ year_arr = [str(yr) for yr in np.arange(1990, current_yr + 1, 1)]
 data_description_missions = ['gpsmet/', 'gpsmetas/', 'grace/', 'sacc/', 'champ/', 'cosmic1/', 'cosmic2/',
                              'tsx/', 'tdx/', 'cnofs/', 'metopa/', 'metopb/', 'metopc/', 'kompsat5/', 'paz/']
 
-#data_description_missions_urls = ['https://data.cosmic.ucar.edu/gnss-ro/champ/', 'https://data.cosmic.ucar.edu/gnss-ro/cnofs/',
-#                                  'https://data.cosmic.ucar.edu/gnss-ro/cosmic1/', 'https://data.cosmic.ucar.edu/gnss-ro/cosmic2/',
-#                                  'https://data.cosmic.ucar.edu/gnss-ro/gpsmet/', 'https://data.cosmic.ucar.edu/gnss-ro/gpsmetas/',
-#                                  'https://data.cosmic.ucar.edu/gnss-ro/grace/', 'https://data.cosmic.ucar.edu/gnss-ro/kompsat5/',
-#                                  'https://data.cosmic.ucar.edu/gnss-ro/metopa/', 'https://data.cosmic.ucar.edu/gnss-ro/metopb/',
-#                                  'https://data.cosmic.ucar.edu/gnss-ro/metopc/', 'https://data.cosmic.ucar.edu/gnss-ro/paz/',
-#                                  'https://data.cosmic.ucar.edu/gnss-ro/sacc/', 'https://data.cosmic.ucar.edu/gnss-ro/tdx/',
-#                                  'https://data.cosmic.ucar.edu/gnss-ro/tsx/']
 
 home_path = os.environ['HOME']
 
@@ -36,7 +28,12 @@ valid_proc_types = ['repro2016/', 'postProc/', 'repro2013/', 'nrt/']
 
 
 def check_if_valid_proc_type(url):
-
+    """
+    Function used to check if the program is searching under a valid processing type. Takes a ucar url as input and
+    returns True if under a valid processing type and False otherwise.
+    :param url:
+    :return True/False:
+    """
     for valid_proc in valid_proc_types:
         if valid_proc in url:
             return True
@@ -44,7 +41,12 @@ def check_if_valid_proc_type(url):
 
 
 def check_if_correct_level(url):
-
+    """
+    Function used to check if program is searching under the correct level (level1b or level2). Takes a ucar url as
+    input and returns True if under correct level and False otherwise.
+    :param url:
+    :return True/False:
+    """
     excluded_criteria = ['level0/', 'level1a/', 'provisional/', 'tools/']
     for excluded_level in excluded_criteria:
         if excluded_level in url:
@@ -53,7 +55,12 @@ def check_if_correct_level(url):
 
 
 def check_if_correct_filetype(new_url):
-
+    """
+    Function used to check if program has found correct filetypes for download (conPhs, atmPhs, atmPrf, wetPrf, wetPf2).
+    Takes a ucar url as input and returns True if a valid filetype is found and False otherwise.
+    :param new_url:
+    :return True/False:
+    """
     filetype_list = ['conPhs', 'atmPhs', 'atmPrf', 'wetPrf', 'wetPf2']
     if new_url.endswith(".tar.gz"):
         for filetype in filetype_list:
@@ -64,7 +71,12 @@ def check_if_correct_filetype(new_url):
 
 
 def check_if_in_doy_level(new_url):
-
+    """
+    Function used to check if program is searching under the day of year level of the ucar site (example. 001, 056, 300).
+    Takes a ucar url as input and returns True if under day of year level and False otherwise.
+    :param new_url:
+    :return True/False:
+    """
     doy = new_url.split('/')[-2]
 
     if doy in doy_arr:
@@ -75,7 +87,13 @@ def check_if_in_doy_level(new_url):
 
 # Only to be used with base ucar url: "https://data.cosmic.ucar.edu/gnss-ro/"
 def get_mission_level_urls(url):
-
+    """
+    Function used to get mission urls under ucar gnss-ro repo that are described in the data description and not described.
+    Takes the base ucar gnss-ro url as input and returns a dictionary that contains a list of urls for missions in the
+    data description and missions that are not.
+    :param url:
+    :return dictionary:
+    """
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -96,7 +114,13 @@ def get_mission_level_urls(url):
 
 
 def recursive_scrape(url):
-
+    """
+    Function recursively searches input ucar url until correct filetype is found. If the correct .tar.gz file is found,
+    that file url is added to a global list called ucar_urls which will contain the urls needed to download the files.
+    Additionally the urls are written to a file named <mission>.txt for use after the search has concluded.
+    :param url:
+    :return:
+    """
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
     mission = url.split('/')[4]
@@ -128,7 +152,7 @@ def recursive_scrape(url):
                     print("drilling down ----> ", new_url)
                     recursive_scrape(new_url)
 
-    return ucar_urls
+    return
 
 
 def check_last_searched(manifest_filepath):
@@ -265,7 +289,15 @@ def check_for_new_ucar_entries(manifest_last_searched_dict):
 
 
 def check_new_proctype(mission_url, proctype_list):
-
+    """
+    Function is used to check if there are new processing types under a ucar mission url using a list of already existing
+    processing types for the mission as reference. If a processing type is not in the list of given list of processing
+    types, then the processing type url is added to new_url_entries. After all potential processing types are checked the
+    function will retrun a list of all new processing type urls, if any have been found.
+    :param mission_url:
+    :param proctype_list:
+    :return new_url_entries:
+    """
     new_url_entries = []
 
     response = requests.get(mission_url)
@@ -288,7 +320,15 @@ def check_new_proctype(mission_url, proctype_list):
 
 
 def check_new_proctype_year(proctype_url, last_searched_year):
-
+    """
+    Function used to check if any new year links exist for a processing type. The function takes a processing type url and
+    a last_searched_year or the year that will be used as the floor to determine if any years greater than exist. If an years
+    greater than the last_searched_year exist the url will be added to a list and that list will be returned after the search is
+    complete
+    :param proctype_url:
+    :param last_searched_year:
+    :return new_url_entries:
+    """
     new_url_entries = []
 
     for level in ['level1b/', 'level2/']:
@@ -313,7 +353,13 @@ def check_new_proctype_year(proctype_url, last_searched_year):
 
 
 def check_before_proctype_year(proctype_url, last_searched_year):
-
+    """
+    Function used to get year links under the proctype_url before the last_searched_year. Function will return a list of
+    year urls less than the input last_searched_year.
+    :param proctype_url:
+    :param last_searched_year:
+    :return new_url_entries:
+    """
     new_url_entries = []
 
     for level in ['level1b/', 'level2/']:
@@ -338,7 +384,15 @@ def check_before_proctype_year(proctype_url, last_searched_year):
 
 
 def check_new_doy(proctype_url, last_searched_year, last_searched_doy):
-
+    """
+    Function used to check if an new day of year links exist under the input proctype_url using the input last_searched_year
+    and the input last_searched_doy. The function will return a list of all day of year urls found that contain a day of year
+    greater than the input doy
+    :param proctype_url:
+    :param last_searched_year:
+    :param last_searched_doy:
+    :return new_url_entries:
+    """
     new_url_entries = []
 
     for level in ['level1b/', 'level2/']:
@@ -362,7 +416,14 @@ def check_new_doy(proctype_url, last_searched_year, last_searched_doy):
 
 
 def check_before_doy(proctype_url, last_searched_year, last_searched_doy):
-
+    """
+    Function checks for days of year before the input last_searched_doy under the input proctype_url. If a day of year is
+    less than the input doy then it is added to a list of urls containing days of year less than the input
+    :param proctype_url:
+    :param last_searched_year:
+    :param last_searched_doy:
+    :return new_url_enetries:
+    """
     new_url_entries = []
 
     for level in ['level1b/', 'level2/']:
@@ -385,7 +446,12 @@ def check_before_doy(proctype_url, last_searched_year, last_searched_doy):
     return new_url_entries
 
 def download_file(url):
-
+    """
+    Function will use the input url (ending in .tar.gz) to download the file at the url to local storage. The function will
+    return the path to the file
+    :param url:
+    :return full_path:
+    """
     local_filename = url.split('/')[-1]
     local_root_path = create_local_dir_mirror_ucar(url)
     full_path = os.path.join(local_root_path, local_filename)
@@ -404,7 +470,11 @@ def download_file(url):
 
 
 def create_local_dir_mirror_ucar(url):
-
+    """
+    Function creates local directories from input url. Function returns the resulting local path
+    :param url:
+    :return local_path:
+    """
     root_path = os.path.split(url.replace(ucar_site, ''))[0]
     local_path = os.path.join(home_path, 'ucar_repo', root_path)
 
@@ -414,7 +484,12 @@ def create_local_dir_mirror_ucar(url):
 
 
 def create_s3_obj_key_file(bucket):
-
+    """
+    Function will create an obj key file for the contents of the input s3 bucket. Function will return the location of
+    the file.
+    :param bucket:
+    :return file_loc:
+    """
     bucket_obj_list = []
     for my_bucket_object in bucket.objects.all():
         key = my_bucket_object.key
@@ -433,7 +508,12 @@ def create_s3_obj_key_file(bucket):
 
 
 # To be run on ucar-earth-ro-archive bucket obj_key_file 1/10/2022
-def add_zero_pad_doy_to_key_file():
+def add_zero_pad_doy_to_key_file(s3_obj_key_file_path):
+    """
+    Function will add zero padding to obj key file entries that do not have proper zero padding
+    :param s3_obj_key_file_path:
+    :return:
+    """
     with open(s3_obj_key_file_path, 'r') as s3_obj_key_file:
         with open("/home/i28373/zero_pad_ucar_objKey.txt", 'w') as new_s3_obj_key_file:
             for line in s3_obj_key_file:
@@ -444,7 +524,13 @@ def add_zero_pad_doy_to_key_file():
 
 
 def check_zero_pad_doy(obj_file_key):
-
+    """
+    Function checks if obj file keys in obj key file have proper zero pad. If zero pad is incorrect in entry then the function
+    will add it to the entry and return a properly zero padded entry. If the entry is correct then the function will return
+    the input obj_file_key
+    :param obj_file_key:
+    :return zero_pad_key or obj_file_key:
+    """
     print(f"obj_file_key: {obj_file_key}")
     no_zero_pad_two_digit = re.search("/([0-9][0-9])/", obj_file_key)
     no_zero_pad_one_digit = re.search("/([0-9])/", obj_file_key)
